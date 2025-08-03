@@ -1,0 +1,164 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "dcf78b1a-cc23-4232-bf72-46d982b96e23",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "duplicateItem": "={{ false }}",
+        "assignments": {
+          "assignments": [
+            { "id": "4245b947-9bc9-478c-80a9-32b7b2d2fbcc", "name": "=startAt", "value": 0, "type": "number" },
+            { "id": "9f8055e8-6105-403c-9510-965598942887", "name": "allIssues", "value": "[]", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "id": "ed233c8a-af3c-4bf3-9934-9f901fcba2a6",
+      "name": "Init Pagination"
+    },
+    {
+      "parameters": {
+        "url": "https://trovent.atlassian.net/rest/api/3/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "jql", "value": "project=YS" },
+            { "name": "startAt", "value": "={{ $json[\"startAt\"] }}" },
+            { "name": "maxResults", "value": "100" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "id": "7dd75d7f-5b94-45b4-854d-bd5df6d3c0f3",
+      "name": "Fetch JIRA Issues",
+      "credentials": {
+        "httpBasicAuth": { "id": "wEKoD9npFw9QkOdg", "name": "Unnamed credential 2" }
+      }
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "output = []\n\ndef get_description_text(description_block):\n    if not description_block:\n        return \"\"\n    result = []\n    for block in description_block.get(\"content\", []):\n        if block.get(\"type\") == \"paragraph\":\n            line = \" \".join([c.get(\"text\", \"\") for c in block.get(\"content\", [])])\n            result.append(line)\n        elif block.get(\"type\") == \"bulletList\":\n            for item in block.get(\"content\", []):\n                for para in item.get(\"content\", []):\n                    line = \" \".join([c.get(\"text\", \"\") for c in para.get(\"content\", [])])\n                    result.append(f\"- {line}\")\n    return \"\\n\".join(result)\n\nall_issues = items[0][\"json\"].get(\"allIssues\", [])\n\nfor index, issue in enumerate(all_issues, start=1):\n    fields = issue.get(\"fields\", {})\n\n    issue_data = {\n        \"issue_number\": index,\n        \"id\": issue.get(\"id\"),\n        \"key\": issue.get(\"key\"),\n        \"summary\": fields.get(\"summary\", \"\"),\n        \"status\": fields.get(\"status\", {}).get(\"name\", \"\"),\n        \"statusCategory\": fields.get(\"statusCategory\", {}).get(\"name\", \"\"),\n        \"issueType\": fields.get(\"issuetype\", {}).get(\"name\", \"\"),\n        \"priority\": fields.get(\"priority\", {}).get(\"name\", \"\"),\n        \"project\": fields.get(\"project\", {}).get(\"name\", \"\"),\n        \"created\": fields.get(\"created\", \"\"),\n        \"updated\": fields.get(\"updated\", \"\"),\n        \"description\": get_description_text(fields.get(\"description\", {})),\n        \"reporter\": fields.get(\"reporter\", {}).get(\"displayName\", \"\"),\n        \"assignee\": fields.get(\"assignee\", {}).get(\"displayName\", \"\") if fields.get(\"assignee\") else None,\n        \"parent\": fields.get(\"parent\", {}).get(\"key\") if \"parent\" in fields else None\n    }\n\n    output.append({\"json\": issue_data})\n\nreturn output"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 0],
+      "id": "398aa18c-8cec-4bdf-b107-7dfb46b5b878",
+      "name": "Clean JIRA Issues"
+    },
+    {
+      "parameters": {
+        "url": "https://trovent.atlassian.net/rest/api/3/issue/{{$json[\"key\"]}}/comment",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 200],
+      "id": "fetch-comments-node",
+      "name": "Fetch Comments for Issue",
+      "credentials": {
+        "httpBasicAuth": { "id": "wEKoD9npFw9QkOdg", "name": "Unnamed credential 2" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/embed_store",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ [$json] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 200],
+      "id": "f606458c-d492-4d95-838b-1b6948c84170",
+      "name": "embed and store"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/rag_answer",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "accept", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "How many are in status \"Done\" in YourScope including epic, tasks and list out their names and id?"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1720, 200],
+      "id": "b88af005-43ed-4a73-8444-415bf35ba88e",
+      "name": "Ask RAG"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [[{ "node": "Init Pagination", "type": "main", "index": 0 }]]
+    },
+    "Init Pagination": {
+      "main": [[{ "node": "Fetch JIRA Issues", "type": "main", "index": 0 }]]
+    },
+    "Fetch JIRA Issues": {
+      "main": [[{ "node": "Merge Issues", "type": "main", "index": 0 }]]
+    },
+    "Merge Issues": {
+      "main": [[{ "node": "If more issues?", "type": "main", "index": 0 }]]
+    },
+    "If more issues?": {
+      "main": [
+        [{ "node": "Clean JIRA Issues", "type": "main", "index": 0 }, { "node": "Fetch JIRA Issues", "type": "main", "index": 0 }],
+        [{ "node": "Clean JIRA Issues", "type": "main", "index": 0 }]
+      ]
+    },
+    "Clean JIRA Issues": {
+      "main": [[{ "node": "Fetch Comments for Issue", "type": "main", "index": 0 }]]
+    },
+    "Fetch Comments for Issue": {
+      "main": [[{ "node": "embed and store", "type": "main", "index": 0 }]]
+    },
+    "embed and store": {
+      "main": [[{ "node": "Ask RAG", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "updated-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "qnMpurWfdKVvldS4",
+  "tags": []
+}

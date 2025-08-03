@@ -1,0 +1,108 @@
+{
+  "name": "My workflow 8",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e5aa5840-19e3-44aa-9d04-799c6f9b2d2f",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/prepare_training",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "440cde48-f88d-4837-a560-f3d930dff1d0",
+      "name": "Prepare Training"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/sft_train",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "2d0aade3-3d4a-4d20-974b-f237d6c36ad9",
+      "name": "Training"
+    },
+    {
+      "parameters": {
+        "source": "parameter",
+        "workflowJson": "{\n  \"name\": \"Working workflow\",\n  \"nodes\": [\n    {\n      \"parameters\": {},\n      \"type\": \"n8n-nodes-base.manualTrigger\",\n      \"typeVersion\": 1,\n      \"position\": [\n        -720,\n        -100\n      ],\n      \"id\": \"4ecab309-2ae0-49f5-9d80-1273162f83ce\",\n      \"name\": \"When clicking ‘Execute workflow’\"\n    },\n    {\n      \"parameters\": {\n        \"duplicateItem\": \"={{ false }}\",\n        \"assignments\": {\n          \"assignments\": [\n            {\n              \"name\": \"startAt\",\n              \"value\": 0,\n              \"type\": \"number\"\n            },\n            {\n              \"name\": \"allIssues\",\n              \"value\": \"[]\",\n              \"type\": \"string\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.4,\n      \"position\": [\n        -500,\n        -100\n      ],\n      \"id\": \"377a8fd9-8c48-406d-a273-fe6b5d3c4f59\",\n      \"name\": \"Init Pagination\"\n    },\n    {\n      \"parameters\": {\n        \"url\": \"https://trovent.atlassian.net/rest/api/3/search\",\n        \"authentication\": \"genericCredentialType\",\n        \"genericAuthType\": \"httpBasicAuth\",\n        \"sendQuery\": true,\n        \"queryParameters\": {\n          \"parameters\": [\n            {\n              \"name\": \"jql\",\n              \"value\": \"project=YS\"\n            },\n            {\n              \"name\": \"startAt\",\n              \"value\": \"={{ $json[\\\"startAt\\\"] }}\"\n            },\n            {\n              \"name\": \"maxResults\",\n              \"value\": \"100\"\n            },\n            {\n              \"name\": \"name\",\n              \"value\": \"expand\"\n            },\n            {\n              \"name\": \"value\",\n              \"value\": \"renderedFields,comments\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.2,\n      \"position\": [\n        -60,\n        -100\n      ],\n      \"id\": \"d9c379a8-ab2d-4da7-b0de-836caa238ec7\",\n      \"name\": \"Fetch JIRA Issues\",\n      \"credentials\": {\n        \"httpBasicAuth\": {\n          \"id\": \"wEKoD9npFw9QkOdg\",\n          \"name\": \"Unnamed credential 2\"\n        }\n      }\n    },\n    {\n      \"parameters\": {\n        \"language\": \"python\",\n        \"pythonCode\": \"import json\\n\\noutput = []\\n\\n# Parse the stringified allIssues list\\ntotal_issues = items[0][\\\"json\\\"].get(\\\"total\\\", 0)\\nraw_issues = items[0][\\\"json\\\"].get(\\\"allIssues\\\", \\\"[]\\\")\\nall_issues = json.loads(raw_issues) if isinstance(raw_issues, str) else raw_issues\\n\\n\\ndef get_description_text(description_block):\\n    if not description_block:\\n        return \\\"\\\"\\n    result = []\\n    for block in description_block.get(\\\"content\\\", []):\\n        if block.get(\\\"type\\\") == \\\"paragraph\\\":\\n            line = \\\" \\\".join([c.get(\\\"text\\\", \\\"\\\") for c in block.get(\\\"content\\\", [])])\\n            result.append(line)\\n        elif block.get(\\\"type\\\") == \\\"bulletList\\\":\\n            for item in block.get(\\\"content\\\", []):\\n                for para in item.get(\\\"content\\\", []):\\n                    line = \\\" \\\".join([c.get(\\\"text\\\", \\\"\\\") for c in para.get(\\\"content\\\", [])])\\n                    result.append(f\\\"- {line}\\\")\\n    return \\\"\\\\n\\\".join(result)\\n\\nfor index, issue in enumerate(all_issues, start=1):\\n    fields = issue.get(\\\"fields\\\", {})\\n    issue_data = {\\n        \\\"issue_number\\\": index,\\n        \\\"id\\\": issue.get(\\\"id\\\"),\\n        \\\"key\\\": issue.get(\\\"key\\\"),\\n        \\\"self\\\": issue.get(\\\"self\\\"),\\n        \\\"summary\\\": fields.get(\\\"summary\\\", \\\"\\\"),\\n        \\\"status\\\": fields.get(\\\"status\\\", {}).get(\\\"name\\\", \\\"\\\"),\\n        \\\"statusCategory\\\": fields.get(\\\"statusCategory\\\", {}).get(\\\"name\\\", \\\"\\\"),\\n        \\\"issueType\\\": fields.get(\\\"issuetype\\\", {}).get(\\\"name\\\", \\\"\\\"),\\n        \\\"priority\\\": fields.get(\\\"priority\\\", {}).get(\\\"name\\\", \\\"\\\"),\\n        \\\"project\\\": fields.get(\\\"project\\\", {}).get(\\\"name\\\", \\\"\\\"),\\n        \\\"created\\\": fields.get(\\\"created\\\", \\\"\\\"),\\n        \\\"updated\\\": fields.get(\\\"updated\\\", \\\"\\\"),\\n        \\\"description\\\": get_description_text(fields.get(\\\"description\\\", {})),\\n        \\\"reporter\\\": fields.get(\\\"reporter\\\", {}).get(\\\"displayName\\\", \\\"\\\"),\\n        \\\"assignee\\\": fields.get(\\\"assignee\\\", {}).get(\\\"displayName\\\", \\\"\\\") if fields.get(\\\"assignee\\\") else None,\\n        \\\"parent\\\": fields.get(\\\"parent\\\", {}).get(\\\"key\\\") if \\\"parent\\\" in fields else None,\\n    \\\"total\\\": total_issues}\\n    output.append({ \\\"json\\\": issue_data })\\n\\nreturn output\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        580,\n        -120\n      ],\n      \"id\": \"a99d8564-7ac2-494f-9dbf-7afc5f739b6e\",\n      \"name\": \"Clean JIRA Issues\"\n    },\n    {\n      \"parameters\": {\n        \"language\": \"python\",\n        \"pythonCode\": \"# NO JSON IMPORT NEEDED, n8n handles it natively\\n\\ndef to_native(obj):\\n    try:\\n        if isinstance(obj, list):\\n            return [to_native(i) for i in obj]\\n        elif isinstance(obj, dict):\\n            return {str(k): to_native(v) for k, v in obj.items()}\\n        elif hasattr(obj, 'to_dict'):\\n            return to_native(obj.to_dict())\\n        else:\\n            return obj\\n    except Exception:\\n        return str(obj)\\n\\noutput = []\\nraw = to_native(items[0][\\\"json\\\"])\\nstart_at = raw.get(\\\"startAt\\\", 0)\\ntotal = raw.get(\\\"total\\\", 0)\\ntry:\\n    all_issues = json.loads(raw.get(\\\"allIssues\\\", \\\"[]\\\"))\\nexcept Exception:\\n    all_issues = []\\nnew_issues = raw.get(\\\"issues\\\", [])\\nall_issues.extend(to_native(new_issues))\\noutput.append({\\n    \\\"json\\\": {\\n        \\\"startAt\\\": start_at + 100,\\n        \\\"total\\\": total,\\n        \\\"allIssues\\\": all_issues\\n    }\\n})\\nreturn output\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        120,\n        -100\n      ],\n      \"id\": \"2129078d-c27b-4fd6-810e-f668d1354d7e\",\n      \"name\": \"Merge Issues\"\n    },\n    {\n      \"parameters\": {\n        \"conditions\": {\n          \"options\": {\n            \"caseSensitive\": true,\n            \"leftValue\": \"\",\n            \"typeValidation\": \"strict\",\n            \"version\": 2\n          },\n          \"conditions\": [\n            {\n              \"leftValue\": \"={{$json[\\\"startAt\\\"]}}\",\n              \"rightValue\": \"={{ $json.total }}\",\n              \"operator\": {\n                \"type\": \"number\",\n                \"operation\": \"lt\"\n              }\n            }\n          ],\n          \"combinator\": \"and\"\n        },\n        \"looseTypeValidation\": \"={{ false }}\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.if\",\n      \"typeVersion\": 2.2,\n      \"position\": [\n        340,\n        -100\n      ],\n      \"id\": \"6c085274-29a5-4024-beb1-f44cb2a352a5\",\n      \"name\": \"If more issues?\"\n    },\n    {\n      \"parameters\": {\n        \"language\": \"python\",\n        \"pythonCode\": \"return [{\\\"json\\\": item[\\\"json\\\"]} for item in items]\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        820,\n        -120\n      ],\n      \"id\": \"01fb26ec-0654-4123-bc38-f5bbfd375f5e\",\n      \"name\": \"Split items\"\n    },\n    {\n      \"parameters\": {\n        \"url\": \"={{ $json[\\\"self\\\"] }}\",\n        \"authentication\": \"genericCredentialType\",\n        \"genericAuthType\": \"httpBasicAuth\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.2,\n      \"position\": [\n        1100,\n        -300\n      ],\n      \"id\": \"d2635e1c-fc49-426a-bac3-d8b234381e8d\",\n      \"name\": \"Extract the comment1\",\n      \"credentials\": {\n        \"httpBasicAuth\": {\n          \"id\": \"Typ790UjKBNWiViy\",\n          \"name\": \"Unnamed credential\"\n        }\n      }\n    },\n    {\n      \"parameters\": {\n        \"language\": \"python\",\n        \"pythonCode\": \"def extract_all_text_with_mentions(body):\\n    if not body:\\n        return \\\"\\\"\\n    text_parts = []\\n\\n    def extract_from_content(content_blocks):\\n        for block in content_blocks:\\n            block_type = block.get(\\\"type\\\")\\n            if block_type == \\\"text\\\" and \\\"text\\\" in block:\\n                text_parts.append(block[\\\"text\\\"])\\n            elif block_type == \\\"mention\\\" and \\\"attrs\\\" in block:\\n                text_parts.append(block[\\\"attrs\\\"].get(\\\"text\\\", \\\"\\\"))\\n            elif \\\"content\\\" in block:\\n                extract_from_content(block[\\\"content\\\"])\\n\\n    extract_from_content(body.get(\\\"content\\\", []))\\n    return \\\" \\\".join(text_parts)\\n\\n\\noutput = []\\n\\noutput = []\\n\\nfor item in items:\\n    fields = item[\\\"json\\\"].get(\\\"fields\\\", {})\\n    comments = fields.get(\\\"comment\\\", {}).get(\\\"comments\\\", [])\\n\\n    flattened_comments = [\\n        {\\n            \\\"author\\\": c.get(\\\"author\\\", {}).get(\\\"displayName\\\", \\\"\\\"),\\n            \\\"created\\\": c.get(\\\"created\\\"),\\n            \\\"comment\\\": extract_all_text_with_mentions(c.get(\\\"body\\\"))\\n        }\\n        for c in comments\\n    ]\\n\\n    output.append({\\n        \\\"json\\\": {\\n            \\\"key\\\": item[\\\"json\\\"].get(\\\"key\\\"),\\n            \\\"comments_flattened\\\": flattened_comments,\\n        }\\n    })\\n\\nreturn output\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        1340,\n        -300\n      ],\n      \"id\": \"69409bdf-5f84-4377-ada5-afbd0e68f181\",\n      \"name\": \"Flatten the comment1\"\n    },\n    {\n      \"parameters\": {\n        \"mode\": \"combine\",\n        \"fieldsToMatchString\": \"key\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.merge\",\n      \"typeVersion\": 3.2,\n      \"position\": [\n        1580,\n        -140\n      ],\n      \"id\": \"b0fb6d99-58bf-4f0d-ad5e-016e57088808\",\n      \"name\": \"Merge Comment\"\n    },\n    {\n      \"parameters\": {\n        \"url\": \"http://127.0.0.1:8000/reset\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.2,\n      \"position\": [\n        -280,\n        -100\n      ],\n      \"id\": \"80fd91a5-f247-4336-b0dc-40c435e79b7c\",\n      \"name\": \"Reset JSONs\"\n    },\n    {\n      \"parameters\": {\n        \"method\": \"POST\",\n        \"url\": \"http://127.0.0.1:8000/generate_training\",\n        \"sendBody\": true,\n        \"specifyBody\": \"json\",\n        \"jsonBody\": \"={{ [$json] }}\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.2,\n      \"position\": [\n        1800,\n        -140\n      ],\n      \"id\": \"0fc6b661-2971-4edd-883b-e033f207f113\",\n      \"name\": \"Generate Training\"\n    }\n  ],\n  \"pinData\": {},\n  \"connections\": {\n    \"When clicking ‘Execute workflow’\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Init Pagination\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Init Pagination\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Reset JSONs\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Fetch JIRA Issues\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Merge Issues\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Merge Issues\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"If more issues?\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"If more issues?\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Clean JIRA Issues\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Fetch JIRA Issues\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ],\n        [\n          {\n            \"node\": \"Clean JIRA Issues\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Clean JIRA Issues\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Split items\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Split items\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Extract the comment1\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Merge Comment\",\n            \"type\": \"main\",\n            \"index\": 1\n          }\n        ]\n      ]\n    },\n    \"Extract the comment1\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Flatten the comment1\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Flatten the comment1\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Merge Comment\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Merge Comment\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Generate Training\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Reset JSONs\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Fetch JIRA Issues\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"active\": false,\n  \"settings\": {\n    \"executionOrder\": \"v1\"\n  },\n  \"versionId\": \"28bc184c-6331-4124-a7d5-e05dd27e9ed2\",\n  \"meta\": {\n    \"instanceId\": \"db13bff56abe5c893af4556f7f8966c41af1ec67dfbf256dab729685374ad149\"\n  },\n  \"id\": \"9VVbVxKeNG4GHm5T\",\n  \"tags\": []\n}\n\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        0
+      ],
+      "name": "Call Generate Training data",
+      "id": "08b6d769-1d6e-4156-897e-61e43b1eebb3",
+      "executeOnce": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Call Generate Training data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Training": {
+      "main": [
+        [
+          {
+            "node": "Training",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Generate Training data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Training",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ab2186fc-c3e6-4f75-8252-30a495250bed",
+  "meta": {
+    "instanceId": "db13bff56abe5c893af4556f7f8966c41af1ec67dfbf256dab729685374ad149"
+  },
+  "id": "kfwleGe3zBt5TXS5",
+  "tags": []
+}
